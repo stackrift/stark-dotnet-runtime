@@ -4198,14 +4198,14 @@ bool ValueNumStore::IsVNConstant(ValueNum vn)
     }
 }
 
-bool ValueNumStore::IsVNInt32Constant(ValueNum vn)
+bool ValueNumStore::IsVNNativeIntConstant(ValueNum vn)
 {
     if (!IsVNConstant(vn))
     {
         return false;
     }
 
-    return TypeOfVN(vn) == TYP_INT;
+    return TypeOfVN(vn) == TYP_I_IMPL;
 }
 
 unsigned ValueNumStore::GetHandleFlags(ValueNum vn)
@@ -4247,7 +4247,7 @@ bool ValueNumStore::IsVNConstantBound(ValueNum vn)
         return false;
     }
 
-    return IsVNInt32Constant(funcAttr.m_args[0]) != IsVNInt32Constant(funcAttr.m_args[1]);
+    return IsVNNativeIntConstant(funcAttr.m_args[0]) != IsVNNativeIntConstant(funcAttr.m_args[1]);
 }
 
 void ValueNumStore::GetConstantBoundInfo(ValueNum vn, ConstantBoundInfo* info)
@@ -4259,19 +4259,27 @@ void ValueNumStore::GetConstantBoundInfo(ValueNum vn, ConstantBoundInfo* info)
     VNFuncApp funcAttr;
     GetVNFunc(vn, &funcAttr);
 
-    bool isOp1Const = IsVNInt32Constant(funcAttr.m_args[1]);
+    bool isOp1Const = IsVNNativeIntConstant(funcAttr.m_args[1]);
 
     if (isOp1Const)
     {
         info->cmpOper  = funcAttr.m_func;
         info->cmpOpVN  = funcAttr.m_args[0];
+#if defined(STARK) && defined(_TARGET_64BIT_)
+        info->constVal = GetConstantInt64(funcAttr.m_args[1]);
+#else
         info->constVal = GetConstantInt32(funcAttr.m_args[1]);
+#endif
     }
     else
     {
         info->cmpOper  = GenTree::SwapRelop((genTreeOps)funcAttr.m_func);
         info->cmpOpVN  = funcAttr.m_args[1];
+#if defined(STARK) && defined(_TARGET_64BIT_)
+        info->constVal = GetConstantInt64(funcAttr.m_args[0]);
+#else
         info->constVal = GetConstantInt32(funcAttr.m_args[0]);
+#endif
     }
 }
 
@@ -4490,15 +4498,19 @@ bool ValueNumStore::IsVNNewArr(ValueNum vn, VNFuncApp* funcApp)
     return result;
 }
 
-int ValueNumStore::GetNewArrSize(ValueNum vn)
+NATIVE_INT ValueNumStore::GetNewArrSize(ValueNum vn)
 {
     VNFuncApp funcApp;
     if (IsVNNewArr(vn, &funcApp))
     {
         ValueNum arg1VN = funcApp.m_args[1];
+#ifdef STARK
+        if (IsVNConstant(arg1VN) && TypeOfVN(arg1VN) == TYP_I_IMPL)
+#else
         if (IsVNConstant(arg1VN) && TypeOfVN(arg1VN) == TYP_INT)
+#endif
         {
-            return ConstantValue<int>(arg1VN);
+            return ConstantValue<NATIVE_INT>(arg1VN);
         }
     }
     return 0;

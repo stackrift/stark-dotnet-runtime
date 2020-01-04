@@ -5492,6 +5492,10 @@ GenTree* Compiler::fgMorphArrayIndex(GenTree* tree)
         }
 
         // Next introduce a GT_ARR_BOUNDS_CHECK node
+#ifdef STARK
+        var_types bndsChkType = TYP_I_IMPL; // By default, always use a native int
+        GenTree*  arrLen      = gtNewArrLen(TYP_I_IMPL, arrRef, (int)lenOffs);
+#else
         var_types bndsChkType = TYP_INT; // By default, try to use 32-bit comparison for array bounds check.
 
 #ifdef _TARGET_64BIT_
@@ -5510,6 +5514,7 @@ GenTree* Compiler::fgMorphArrayIndex(GenTree* tree)
         {
             arrLen = gtNewCastNode(bndsChkType, arrLen, false, bndsChkType);
         }
+#endif
 
         GenTreeBoundsChk* arrBndsChk = new (this, GT_ARR_BOUNDS_CHECK)
             GenTreeBoundsChk(GT_ARR_BOUNDS_CHECK, TYP_VOID, index, arrLen, SCK_RNGCHK_FAIL);

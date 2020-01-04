@@ -40,10 +40,16 @@ enum var_types : BYTE
 #define TYP_I_IMPL TYP_LONG
 #define TYP_U_IMPL TYP_ULONG
 #define TYPE_REF_IIM TYPE_REF_LNG
+#ifdef STARK
+#define NATIVE_INT INT64
+#else
+#define NATIVE_INT INT
+#endif
 #else
 #define TYP_I_IMPL TYP_INT
 #define TYP_U_IMPL TYP_UINT
 #define TYPE_REF_IIM TYPE_REF_INT
+#define NATIVE_INT INT
 #ifdef _PREFAST_
 // We silence this in the 32-bit build because for portability, we like to have asserts like this:
 // assert(op2->gtType == TYP_INT || op2->gtType == TYP_I_IMPL);

@@ -15976,8 +15976,11 @@ void Compiler::impImportBlockCode(BasicBlock* block)
                 if (opts.OptimizationEnabled())
                 {
                     /* Use GT_ARR_LENGTH operator so rng check opts see this */
+#ifdef STARK
+                    GenTreeArrLen* arrLen = gtNewArrLen(TYP_I_IMPL, op1, OFFSETOF__CORINFO_Array__length);
+#else
                     GenTreeArrLen* arrLen = gtNewArrLen(TYP_INT, op1, OFFSETOF__CORINFO_Array__length);
-
+#endif
                     /* Mark the block as containing a length expression */
 
                     if (op1->gtOper == GT_LCL_VAR)

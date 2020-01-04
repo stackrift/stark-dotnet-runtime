@@ -590,7 +590,7 @@ public:
     bool IsVNConstant(ValueNum vn);
 
     // Returns true iff the VN represents an integeral constant.
-    bool IsVNInt32Constant(ValueNum vn);
+    bool IsVNNativeIntConstant(ValueNum vn);
 
     typedef SmallHashTable<ValueNum, bool, 8U> CheckedBoundVNSet;
 
@@ -647,7 +647,7 @@ public:
     struct ConstantBoundInfo
     {
         // 100 > vnOp
-        int      constVal;
+        NATIVE_INT constVal;
         unsigned cmpOper;
         ValueNum cmpOpVN;
 
@@ -671,7 +671,7 @@ public:
     bool IsVNNewArr(ValueNum vn, VNFuncApp* funcApp);
 
     // Check if "vn" IsVNNewArr and return <= 0 if arr size cannot be determined, else array size.
-    int GetNewArrSize(ValueNum vn);
+    NATIVE_INT GetNewArrSize(ValueNum vn);
 
     // Check if "vn" is "a.len"
     bool IsVNArrLen(ValueNum vn);

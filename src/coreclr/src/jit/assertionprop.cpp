@@ -1820,7 +1820,11 @@ AssertionInfo Compiler::optCreateJTrueBoundsAssertion(GenTree* tree)
         dsc.op1.kind         = O1K_BOUND_LOOP_BND;
         dsc.op1.vn           = relopVN;
         dsc.op2.kind         = O2K_CONST_INT;
+#ifdef STARK
+        dsc.op2.vn           = vnStore->VNZeroForType(TYP_I_IMPL);
+#else
         dsc.op2.vn           = vnStore->VNZeroForType(TYP_INT);
+#endif
         dsc.op2.u1.iconVal   = 0;
         dsc.op2.u1.iconFlags = 0;
         AssertionIndex index = optAddAssertion(&dsc);
@@ -1880,7 +1884,11 @@ AssertionInfo Compiler::optCreateJTrueBoundsAssertion(GenTree* tree)
         dsc.op1.kind         = O1K_CONSTANT_LOOP_BND;
         dsc.op1.vn           = relopVN;
         dsc.op2.kind         = O2K_CONST_INT;
+#ifdef STARK
+        dsc.op2.vn           = vnStore->VNZeroForType(TYP_I_IMPL);
+#else
         dsc.op2.vn           = vnStore->VNZeroForType(TYP_INT);
+#endif
         dsc.op2.u1.iconVal   = 0;
         dsc.op2.u1.iconFlags = 0;
         AssertionIndex index = optAddAssertion(&dsc);

@@ -54,7 +54,7 @@ RangeCheck::OverflowMap* RangeCheck::GetOverflowMap()
 }
 
 // Get the length of the array vn, if it is new.
-int RangeCheck::GetArrLength(ValueNum vn)
+NATIVE_INT RangeCheck::GetArrLength(ValueNum vn)
 {
     ValueNum arrRefVN = m_pCompiler->vnStore->GetArrForLenVn(vn);
     return m_pCompiler->vnStore->GetNewArrSize(arrRefVN);
@@ -86,7 +86,7 @@ bool RangeCheck::BetweenBounds(Range& range, int lower, GenTree* upper)
     JITDUMP("\n");
 #endif
 
-    int arrSize = 0;
+    NATIVE_INT arrSize = 0;
 
     if (vnStore->IsVNConstant(uLimitVN))
     {
@@ -95,7 +95,7 @@ bool RangeCheck::BetweenBounds(Range& range, int lower, GenTree* upper)
 
         if (m_pCompiler->optIsTreeKnownIntValue(true, upper, &constVal, &iconFlags))
         {
-            arrSize = (int)constVal;
+            arrSize = (NATIVE_INT)constVal;
         }
     }
     else if (vnStore->IsVNArrLen(uLimitVN))
@@ -121,7 +121,7 @@ bool RangeCheck::BetweenBounds(Range& range, int lower, GenTree* upper)
             return false;
         }
 
-        int ucns = range.UpperLimit().GetConstant();
+        NATIVE_INT ucns = range.UpperLimit().GetConstant();
 
         // Upper limit: Len + [0..n]
         if (ucns >= 0)
@@ -146,7 +146,7 @@ bool RangeCheck::BetweenBounds(Range& range, int lower, GenTree* upper)
         // lower limit = len + lcns.
         if (range.LowerLimit().IsBinOpArray())
         {
-            int lcns = range.LowerLimit().GetConstant();
+            NATIVE_INT lcns = range.LowerLimit().GetConstant();
             if (lcns >= 0 || -lcns > arrSize)
             {
                 return false;
@@ -161,20 +161,20 @@ bool RangeCheck::BetweenBounds(Range& range, int lower, GenTree* upper)
         {
             return false;
         }
-        int ucns = range.UpperLimit().GetConstant();
+        NATIVE_INT ucns = range.UpperLimit().GetConstant();
         if (ucns >= arrSize)
         {
             return false;
         }
         if (range.LowerLimit().IsConstant())
         {
-            int lcns = range.LowerLimit().GetConstant();
+            NATIVE_INT lcns = range.LowerLimit().GetConstant();
             // Make sure lcns < ucns which is already less than arrSize.
             return (lcns >= 0 && lcns <= ucns);
         }
         if (range.LowerLimit().IsBinOpArray())
         {
-            int lcns = range.LowerLimit().GetConstant();
+            NATIVE_INT lcns = range.LowerLimit().GetConstant();
             // len + lcns, make sure we don't subtract too much from len.
             if (lcns >= 0 || -lcns > arrSize)
             {
@@ -210,7 +210,7 @@ void RangeCheck::OptimizeRangeCheck(BasicBlock* block, Statement* stmt, GenTree*
     // Take care of constant index first, like a[2], for example.
     ValueNum idxVn    = m_pCompiler->vnStore->VNConservativeNormalValue(treeIndex->gtVNPair);
     ValueNum arrLenVn = m_pCompiler->vnStore->VNConservativeNormalValue(bndsChk->gtArrLen->gtVNPair);
-    int      arrSize  = 0;
+    NATIVE_INT arrSize = 0;
 
     if (m_pCompiler->vnStore->IsVNConstant(arrLenVn))
     {
@@ -219,7 +219,7 @@ void RangeCheck::OptimizeRangeCheck(BasicBlock* block, Statement* stmt, GenTree*
 
         if (m_pCompiler->optIsTreeKnownIntValue(true, bndsChk->gtArrLen, &constVal, &iconFlags))
         {
-            arrSize = (int)constVal;
+            arrSize = (NATIVE_INT)constVal;
         }
     }
     else
@@ -380,12 +380,16 @@ bool RangeCheck::IsMonotonicallyIncreasing(GenTree* expr, bool rejectNegativeCon
     // If expr is constant, then it is not part of the dependency
     // loop which has to increase monotonically.
     ValueNum vn = expr->gtVNPair.GetConservative();
-    if (m_pCompiler->vnStore->IsVNInt32Constant(vn))
+    if (m_pCompiler->vnStore->IsVNNativeIntConstant(vn))
     {
         if (rejectNegativeConst)
         {
-            int cons = m_pCompiler->vnStore->ConstantValue<int>(vn);
-            return (cons >= 0);
+            var_types typeOfVN = m_pCompiler->vnStore->TypeOfVN(vn);
+            if (typeOfVN == TYP_INT)
+            {
+                return m_pCompiler->vnStore->ConstantValue<int>(vn) >= 0;
+            }
+            return m_pCompiler->vnStore->ConstantValue<INT64>(vn) >= 0;
         }
         else
         {
@@ -558,7 +562,7 @@ void RangeCheck::MergeEdgeAssertions(GenTreeLclVarCommon* lcl, ASSERT_VALARG_TP 
             }
 
             // If the operand that operates on the bound is not constant, then done.
-            if (!m_pCompiler->vnStore->IsVNInt32Constant(info.arrOp))
+            if (!m_pCompiler->vnStore->IsVNNativeIntConstant(info.arrOp))
             {
                 continue;
             }
@@ -610,7 +614,11 @@ void RangeCheck::MergeEdgeAssertions(GenTreeLclVarCommon* lcl, ASSERT_VALARG_TP 
         assert(limit.IsBinOpArray() || limit.IsConstant());
 
         // Make sure the assertion is of the form != 0 or == 0.
+#ifdef STARK
+        if (curAssertion->op2.vn != m_pCompiler->vnStore->VNZeroForType(TYP_I_IMPL))
+#else
         if (curAssertion->op2.vn != m_pCompiler->vnStore->VNZeroForType(TYP_INT))
+#endif
         {
             continue;
         }
@@ -686,8 +694,8 @@ void RangeCheck::MergeEdgeAssertions(GenTreeLclVarCommon* lcl, ASSERT_VALARG_TP 
                 continue;
             }
 
-            int curCns = pRange->uLimit.cns;
-            int limCns = (limit.IsBinOpArray()) ? limit.cns : 0;
+            NATIVE_INT curCns = pRange->uLimit.cns;
+            NATIVE_INT limCns = (limit.IsBinOpArray()) ? limit.cns : 0;
 
             // Incoming limit doesn't tighten the existing upper limit.
             if (limCns >= curCns)
@@ -865,9 +873,9 @@ Range RangeCheck::ComputeRangeForLocalDef(BasicBlock*          block,
 #define ARRLEN_MAX (0x7FFFFFFF)
 
 // Get the limit's maximum possible value, treating array length to be ARRLEN_MAX.
-bool RangeCheck::GetLimitMax(Limit& limit, int* pMax)
+bool RangeCheck::GetLimitMax(Limit& limit, NATIVE_INT* pMax)
 {
-    int& max1 = *pMax;
+    NATIVE_INT& max1 = *pMax;
     switch (limit.type)
     {
         case Limit::keConstant:
@@ -876,12 +884,12 @@ bool RangeCheck::GetLimitMax(Limit& limit, int* pMax)
 
         case Limit::keBinOpArray:
         {
-            int tmp = GetArrLength(limit.vn);
+            NATIVE_INT tmp = GetArrLength(limit.vn);
             if (tmp <= 0)
             {
                 tmp = ARRLEN_MAX;
             }
-            if (IntAddOverflows(tmp, limit.GetConstant()))
+            if (NativeIntAddOverflows(tmp, limit.GetConstant()))
             {
                 return false;
             }
@@ -898,19 +906,19 @@ bool RangeCheck::GetLimitMax(Limit& limit, int* pMax)
 // Check if the arithmetic overflows.
 bool RangeCheck::AddOverflows(Limit& limit1, Limit& limit2)
 {
-    int max1;
+    NATIVE_INT max1;
     if (!GetLimitMax(limit1, &max1))
     {
         return true;
     }
 
-    int max2;
+    NATIVE_INT max2;
     if (!GetLimitMax(limit2, &max2))
     {
         return true;
     }
 
-    return IntAddOverflows(max1, max2);
+    return NativeIntAddOverflows(max1, max2);
 }
 
 // Does the bin operation overflow.
@@ -1099,17 +1107,35 @@ Range RangeCheck::ComputeRange(BasicBlock* block, GenTree* expr, bool monIncreas
     // for constants. It could use INT64. Still, representing ULONG constants
     // might require preserving the var_type whether it is a un/signed 64-bit.
     // JIT64 doesn't do anything for "long" either. No asm diffs.
+#ifndef STARK
     else if (expr->TypeGet() == TYP_LONG || expr->TypeGet() == TYP_ULONG)
     {
         range = Range(Limit(Limit::keUnknown));
         JITDUMP("GetRange long or ulong, setting to unknown value.\n");
     }
+#endif
     // If VN is constant return range as constant.
     else if (m_pCompiler->vnStore->IsVNConstant(vn))
     {
+#ifdef STARK
+        var_types typeOfVN = m_pCompiler->vnStore->TypeOfVN(vn);
+        if (typeOfVN == TYP_INT)
+        {
+            range = Range(Limit(Limit::keConstant, m_pCompiler->vnStore->ConstantValue<int>(vn)));
+        }
+        else if (typeOfVN == TYP_LONG)
+        {
+            range = Range(Limit(Limit::keConstant, m_pCompiler->vnStore->ConstantValue<INT64>(vn)));
+        }
+        else
+        {
+            range = Limit(Limit::keUnknown);
+        }
+#else
         range = (m_pCompiler->vnStore->TypeOfVN(vn) == TYP_INT)
                     ? Range(Limit(Limit::keConstant, m_pCompiler->vnStore->ConstantValue<int>(vn)))
                     : Limit(Limit::keUnknown);
+#endif
     }
     // If local, find the definition from the def map and evaluate the range for rhs.
     else if (expr->IsLocal())

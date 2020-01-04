@@ -729,7 +729,11 @@ bool Compiler::optPopulateInitInfo(unsigned loopInd, GenTree* init, unsigned ite
 
     // RHS can be constant or local var.
     // TODO-CQ: CLONE: Add arr length for descending loops.
+#ifdef STARK
+    if (rhs->gtOper == GT_CNS_INT && rhs->TypeGet() == TYP_I_IMPL)
+#else
     if (rhs->gtOper == GT_CNS_INT && rhs->TypeGet() == TYP_INT)
+#endif
     {
         optLoopTable[loopInd].lpFlags |= LPFLG_CONST_INIT;
         optLoopTable[loopInd].lpConstInit = (int)rhs->AsIntCon()->gtIconVal;
@@ -803,7 +807,11 @@ bool Compiler::optCheckIterInLoopTest(
         return false;
     }
 
+#ifdef STARK
+    if (iterOp->gtType != TYP_I_IMPL)
+#else
     if (iterOp->gtType != TYP_INT)
+#endif
     {
         return false;
     }
@@ -875,7 +883,11 @@ unsigned Compiler::optIsLoopIncrTree(GenTree* incr)
 
         // Increment should be by a const int.
         // TODO-CQ: CLONE: allow variable increments.
+#ifdef STARK
+        if ((incrVal->gtOper != GT_CNS_INT) || (incrVal->TypeGet() != TYP_I_IMPL))
+#else
         if ((incrVal->gtOper != GT_CNS_INT) || (incrVal->TypeGet() != TYP_INT))
+#endif
         {
             return BAD_VAR_NUM;
         }
@@ -2989,6 +3001,10 @@ bool jitIterSmallOverflow(int iterAtExit, var_types incrType)
 
         case TYP_UINT: // Detected by checking for 32bit ....
         case TYP_INT:
+#ifdef STARK
+        case TYP_ULONG: // Detected by checking for 64bit ....
+        case TYP_LONG:
+#endif
             return false; // ... overflow same as done for TYP_INT
 
         default:
@@ -3030,6 +3046,10 @@ bool jitIterSmallUnderflow(int iterAtExit, var_types decrType)
 
         case TYP_UINT: // Detected by checking for 32bit ....
         case TYP_INT:
+#ifdef STARK
+        case TYP_ULONG: // Detected by checking for 64bit ....
+        case TYP_LONG:
+#endif
             return false; // ... underflow same as done for TYP_INT
 
         default:
@@ -3062,7 +3082,11 @@ bool Compiler::optComputeLoopRep(int        constInit,
                                  bool       dupCond,
                                  unsigned*  iterCount)
 {
+#ifdef STARK
+    noway_assert(genActualType(iterOperType) == TYP_I_IMPL);
+#else
     noway_assert(genActualType(iterOperType) == TYP_INT);
+#endif
 
     __int64 constInitX;
     __int64 constLimitX;
@@ -3114,6 +3138,20 @@ bool Compiler::optComputeLoopRep(int        constInit,
                 constInitX = (signed int)constInit;
             }
             break;
+
+#ifdef STARK
+        case TYP_LONG:
+        case TYP_ULONG:
+            if (unsTest)
+            {
+                constInitX = (unsigned long long)constInit;
+            }
+            else
+            {
+                constInitX = (long long)constInit;
+            }
+            break;
+#endif
 
         default:
             noway_assert(!"Bad type");
@@ -5633,6 +5671,14 @@ bool Compiler::optNarrowTree(GenTree* tree, var_types srct, var_types dstt, Valu
                     case TYP_UINT:
                         imask = 0xFFFFFFFF;
                         break;
+#ifdef STARK
+                    case TYP_LONG:
+                        imask = 0x7FFFFFFFFFFFFFFF;
+                        break;
+                    case TYP_ULONG:
+                        imask = 0xFFFFFFFFFFFFFFFF;
+                        break;
+#endif
 #endif // _TARGET_64BIT_
                     default:
                         return false;
@@ -5646,8 +5692,13 @@ bool Compiler::optNarrowTree(GenTree* tree, var_types srct, var_types dstt, Valu
 #ifdef _TARGET_64BIT_
                 if (doit)
                 {
+#ifdef STARK
+                    tree->gtType                = TYP_I_IMPL;
+                    tree->AsIntCon()->gtIconVal = (NATIVE_INT)ival;
+#else
                     tree->gtType                = TYP_INT;
                     tree->AsIntCon()->gtIconVal = (int)ival;
+#endif
                     if (vnStore != nullptr)
                     {
                         fgValueNumberTreeConst(tree);

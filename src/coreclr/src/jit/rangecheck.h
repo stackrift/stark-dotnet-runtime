@@ -60,7 +60,21 @@
 #pragma once
 #include "compiler.h"
 
-static bool IntAddOverflows(int max1, int max2)
+#ifdef STARK
+static bool NativeIntAddOverflows(INT64 max1, INT64 max2)
+{
+    if (max1 > 0 && max2 > 0 && LONGLONG_MAX - max1 < max2)
+    {
+        return true;
+    }
+    if (max1 < 0 && max2 < 0 && max1 < LONGLONG_MIN - max2)
+    {
+        return true;
+    }
+    return false;
+}
+#else
+static bool NativeIntAddOverflows(int max1, int max2)
 {
     if (max1 > 0 && max2 > 0 && INT_MAX - max1 < max2)
     {
@@ -72,6 +86,7 @@ static bool IntAddOverflows(int max1, int max2)
     }
     return false;
 }
+#endif
 
 struct Limit
 {
@@ -92,12 +107,12 @@ struct Limit
     {
     }
 
-    Limit(LimitType type, int cns) : cns(cns), vn(ValueNumStore::NoVN), type(type)
+    Limit(LimitType type, NATIVE_INT cns) : cns(cns), vn(ValueNumStore::NoVN), type(type)
     {
         assert(type == keConstant);
     }
 
-    Limit(LimitType type, ValueNum vn, int cns) : cns(cns), vn(vn), type(type)
+    Limit(LimitType type, ValueNum vn, NATIVE_INT cns) : cns(cns), vn(vn), type(type)
     {
         assert(type == keBinOpArray);
     }
@@ -118,7 +133,7 @@ struct Limit
     {
         return type == keConstant;
     }
-    int GetConstant()
+    NATIVE_INT GetConstant()
     {
         return cns;
     }
@@ -126,7 +141,7 @@ struct Limit
     {
         return type == keBinOpArray;
     }
-    bool AddConstant(int i)
+    bool AddConstant(NATIVE_INT i)
     {
         switch (type)
         {
@@ -134,7 +149,7 @@ struct Limit
                 return true;
             case keBinOpArray:
             case keConstant:
-                if (IntAddOverflows(cns, i))
+                if (NativeIntAddOverflows(cns, i))
                 {
                     return false;
                 }
@@ -193,7 +208,7 @@ struct Limit
         unreached();
     }
 #endif
-    int       cns;
+    NATIVE_INT cns;
     ValueNum  vn;
     LimitType type;
 };
@@ -433,7 +448,7 @@ public:
     void MapMethodDefs();
 #endif
 
-    int GetArrLength(ValueNum vn);
+    NATIVE_INT GetArrLength(ValueNum vn);
 
     // Check whether the computed range is within lower and upper bounds. This function
     // assumes that the lower range is resolved and upper range is symbolic as in an
@@ -477,7 +492,7 @@ public:
 
     // The maximum possible value of the given "limit." If such a value could not be determined
     // return "false." For example: ARRLEN_MAX for array length.
-    bool GetLimitMax(Limit& limit, int* pMax);
+    bool GetLimitMax(Limit& limit, NATIVE_INT* pMax);
 
     // Does the addition of the two limits overflow?
     bool AddOverflows(Limit& limit1, Limit& limit2);
